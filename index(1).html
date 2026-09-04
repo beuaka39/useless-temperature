@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Temperature Experience Simulator - Stadium Edition</title>
+  <style>
+    :root {
+      --mode-color-glow: rgba(0, 0, 0, 0);
+      --mode-accent: #888888;
+      --mode-bg-gradient: radial-gradient(circle at center, #121418 0%, #08090b 100%);
+      --vignette-color: rgba(0, 0, 0, 0.7);
+      --hud-bg: rgba(14, 16, 22, 0.82);
+      --hud-border: rgba(255, 255, 255, 0.16);
+      --hud-text: #ffffff;
+      --transition-speed: 1.0s;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030406;
+      color: #ffffff;
+      touch-action: manipulation;
+    }
+
+    /* Outer Wrapper for dynamic screen shock & storm tremors */
+    #experience-root {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--mode-bg-gradient);
+      transition: background var(--transition-speed) ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      transform-origin: center center;
+    }
+
+    /* Ambient Pulsing Glow */
+    #ambient-pulse {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      box-shadow: inset 0 0 160px var(--mode-color-glow);
+      transition: box-shadow var(--transition-speed) cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 2;
+    }
+
+    /* Dynamic Canvas Layer */
+    #fx-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Heat Wave Shimmer Overlay using SVG Filter */
+    #distortion-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+      opacity: 0;
+      backdrop-filter: none;
+      transition: opacity 0.8s ease;
+    }
+
+    body.heat-active #distortion-overlay {
+      opacity: 0.38;
+      filter: url(#heat-filter);
+    }
+
+    /* Blizzard Frost Vignette Border */
+    #frost-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+      opacity: 0;
+      background: radial-gradient(circle, transparent 40%, rgba(160, 230, 255, 0.25) 85%, rgba(200, 245, 255, 0.5) 100%);
+      box-shadow: inset 0 0 100px rgba(180, 240, 255, 0.6);
+      transition: opacity 0.9s ease;
+      mix-blend-mode: screen;
+    }
+
+    body.cool-active #frost-overlay {
+      opacity: 1;
+      animation: frostPulse 2.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes frostPulse {
+      0% { opacity: 0.75; transform: scale(1); }
+      100% { opacity: 1; transform: scale(1.02); }
+    }
+
+    /* Screen Tremors & Fire Flicker Animations */
+    @keyframes infernoBreathe {
+      0%, 100% {
+        transform: scale(1.0) translateY(0);
+        filter: brightness(1.05) contrast(1.1);
+      }
+      25% {
+        transform: scale(1.02) translateY(-2px);
+        filter: brightness(1.22) contrast(1.15);
+      }
+      50% {
+        transform: scale(1.01) translateY(1px);
+        filter: brightness(0.98) contrast(1.08);
+      }
+      75% {
+        transform: scale(1.025) translateY(-3px);
+        filter: brightness(1.18) contrast(1.12);
+      }
+    }
+
+    @keyframes blizzardGale {
+      0%, 100% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+      20% {
+        transform: translate(-3px, 1px) rotate(-0.2deg);
+      }
+      40% {
+        transform: translate(4px, -2px) rotate(0.2deg);
+      }
+      60% {
+        transform: translate(-2px, -1px) rotate(0deg);
+      }
+      80% {
+        transform: translate(3px, 2px) rotate(0.15deg);
+      }
+    }
+
+    body.heat-active #experience-root {
+      animation: infernoBreathe 2.2s ease-in-out infinite;
+    }
+
+    body.cool-active #experience-root {
+      animation: blizzardGale 0.45s ease-in-out infinite;
+    }
+
+    /* Top Status Header */
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 24px 20px 10px;
+      text-align: center;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .brand-title {
+      font-size: 13px;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.65);
+      margin-bottom: 6px;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(0,0,0,0.8);
+    }
+
+    .state-indicator {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--hud-text);
+      transition: color 0.4s ease;
+      text-shadow: 0 0 24px rgba(0, 0, 0, 0.9);
+    }
+
+    .mode-subtext {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 5px;
+      min-height: 22px;
+      transition: all 0.4s ease;
+      font-weight: 500;
+      text-shadow: 0 0 12px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Central Sensory Visual Anchor */
+    .center-stage {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .orb-container {
+      position: relative;
+      width: 210px;
+      height: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ambient-orb {
+      width: 145px;
+      height: 145px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(0,0,0,0) 70%);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 60px;
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.6);
+    }
+
+    body.heat-active .ambient-orb {
+      background: radial-gradient(circle, rgba(255, 140, 20, 0.7) 0%, rgba(240, 50, 0, 0.35) 55%, transparent 85%);
+      border-color: #ffaa33;
+      box-shadow: 0 0 85px rgba(255, 90, 0, 0.9), 0 0 140px rgba(255, 30, 0, 0.6), inset 0 0 45px rgba(255, 190, 40, 0.7);
+      transform: scale(1.15);
+      animation: flamePulse 0.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes flamePulse {
+      0% { transform: scale(1.14); filter: brightness(1); }
+      100% { transform: scale(1.22); filter: brightness(1.25); }
+    }
+
+    body.cool-active .ambient-orb {
+      background: radial-gradient(circle, rgba(160, 240, 255, 0.65) 0%, rgba(0, 160, 255, 0.35) 55%, transparent 85%);
+      border-color: #bbf3ff;
+      box-shadow: 0 0 85px rgba(0, 210, 255, 0.85), 0 0 140px rgba(0, 120, 255, 0.5), inset 0 0 45px rgba(210, 250, 255, 0.6);
+      transform: scale(1.12);
+      animation: blizzardVibrate 0.15s ease-in-out infinite alternate;
+    }
+
+    @keyframes blizzardVibrate {
+      0% { transform: scale(1.11) translate(-1px, 1px); }
+      100% { transform: scale(1.14) translate(1px, -1px); }
+    }
+
+    /* Bottom Control Panel */
+    .controls-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 560px;
+      padding: 0 20px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .main-button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .primary-btn {
+      position: relative;
+      outline: none;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 22px 16px;
+      background: rgba(18, 22, 30, 0.8);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    }
+
+    .primary-btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn-icon {
+      font-size: 38px;
+      line-height: 1;
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
+      transition: transform 0.25s ease;
+    }
+
+    .primary-btn:hover .btn-icon {
+      transform: scale(1.2);
+    }
+
+    .btn-label {
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .btn-desc {
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    /* Button Specific Theming */
+    .heat-btn {
+      border-color: rgba(255, 120, 40, 0.45);
+    }
+    .heat-btn:hover {
+      background: rgba(80, 20, 10, 0.85);
+      border-color: rgba(255, 150, 60, 0.8);
+      box-shadow: 0 12px 35px rgba(255, 80, 0, 0.5);
+    }
+    body.heat-active .heat-btn {
+      background: linear-gradient(135deg, rgba(240, 70, 0, 0.95) 0%, rgba(180, 20, 0, 0.98) 100%);
+      border-color: #ffd285;
+      box-shadow: 0 0 45px rgba(255, 100, 0, 0.85), inset 0 2px 2px rgba(255, 255, 255, 0.5);
+    }
+
+    .cool-btn {
+      border-color: rgba(80, 200, 255, 0.45);
+    }
+    .cool-btn:hover {
+      background: rgba(10, 45, 80, 0.85);
+      border-color: rgba(120, 220, 255, 0.8);
+      box-shadow: 0 12px 35px rgba(0, 200, 255, 0.5);
+    }
+    body.cool-active .cool-btn {
+      background: linear-gradient(135deg, rgba(0, 150, 240, 0.95) 0%, rgba(0, 85, 190, 0.98) 100%);
+      border-color: #d0f7ff;
+      box-shadow: 0 0 45px rgba(0, 210, 255, 0.85), inset 0 2px 2px rgba(255, 255, 255, 0.5);
+    }
+
+    /* Secondary Controls (Stop, Volume, Boost) */
+    .utility-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--hud-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--hud-border);
+      border-radius: 16px;
+      padding: 12px 18px;
+      gap: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    .stop-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      color: #fff;
+      padding: 9px 16px;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .stop-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .stop-btn:active {
+      transform: scale(0.96);
+    }
+
+    .volume-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-grow: 1;
+      justify-content: flex-end;
+    }
+
+    .volume-icon-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.85);
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      max-width: 140px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #4ade80, #f59e0b 60%, #ef4444 100%);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0,0,0,0.8);
+      border: 2px solid #111;
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: 2px solid #111;
+    }
+
+    .volume-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #ffcc00;
+      white-space: nowrap;
+    }
+
+    /* Disclaimer / Sensory Notice */
+    .disclaimer {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.45);
+      text-align: center;
+      line-height: 1.4;
+      letter-spacing: 0.2px;
+      padding: 0 8px;
+    }
+
+
+    /* Voice Command Control */
+    #btn-voice {
+      min-width: 96px;
+      transition: all 0.2s ease;
+    }
+    #btn-voice.listening {
+      border-color: rgba(255, 80, 80, 0.8);
+      background: rgba(130, 20, 20, 0.75);
+      box-shadow: 0 0 24px rgba(255, 70, 70, 0.45);
+    }
+    #btn-voice.unsupported {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .voice-status {
+      min-height: 18px;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      letter-spacing: .4px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      header {
+        padding-top: 16px;
+      }
+      .brand-title {
+        font-size: 11px;
+      }
+      .state-indicator {
+        font-size: 21px;
+      }
+      .mode-subtext {
+        font-size: 12.5px;
+      }
+      .orb-container {
+        width: 160px;
+        height: 160px;
+      }
+      .ambient-orb {
+        width: 110px;
+        height: 110px;
+        font-size: 46px;
+      }
+      .primary-btn {
+        padding: 18px 12px;
+      }
+      .btn-icon {
+        font-size: 32px;
+      }
+      .btn-label {
+        font-size: 16px;
+      }
+      .controls-wrapper {
+        padding-bottom: 20px;
+        gap: 12px;
+      }
+      .volume-slider {
+        max-width: 95px;
+      }
+    }
+  
+/* ===== Useless Project Expansion ===== */
+.useless-panel{position:relative;z-index:20;width:min(920px,94vw);margin:0 auto 12px;padding:12px 14px;border:1px solid rgba(255,255,255,.15);border-radius:16px;background:rgba(8,10,14,.72);backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.useless-title{font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.65;margin-bottom:8px;text-align:center}
+.useless-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.useless-btn{border:1px solid rgba(255,255,255,.16);border-radius:11px;background:rgba(255,255,255,.06);color:#fff;padding:9px 6px;cursor:pointer;font-weight:800;font-size:11px;transition:.2s}
+.useless-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.12)}
+.useless-btn:active{transform:scale(.97)}
+.useless-readout{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:10px;font-size:11px;opacity:.9}
+.fake-temp{font-size:19px;font-weight:900;letter-spacing:.5px}
+.meter{height:8px;flex:1;max-width:360px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden}
+.meter>i{display:block;height:100%;width:87%;background:currentColor;border-radius:99px;transition:width .35s}
+.useless-overlay{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;transition:opacity .25s;background:transparent}
+#environment-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:7;pointer-events:none;opacity:0;transition:opacity .35s}
+body.rain-mode #environment-canvas,body.wind-mode #environment-canvas,body.volcano-mode #environment-canvas{opacity:1}
+body.rain-mode .useless-overlay{opacity:1;background:linear-gradient(180deg,rgba(25,70,110,.04),rgba(5,15,30,.20))}
+body.wind-mode .useless-overlay{opacity:1;background:linear-gradient(90deg,rgba(255,255,255,.03),transparent 30%,rgba(120,180,220,.05))}
+body.volcano-mode .useless-overlay{opacity:1;background:radial-gradient(ellipse at 50% 78%,rgba(255,72,0,.20),transparent 35%),linear-gradient(180deg,transparent 45%,rgba(45,5,0,.16))}
+body.volcano-mode #experience-root{animation:volcanoScreen 1.8s ease-in-out infinite}
+@keyframes volcanoScreen{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(-1px,1px) scale(1.002)}50%{transform:translate(1px,-1px) scale(1.004)}75%{transform:translate(-1px,0) scale(1.002)}}
+@media(max-width:600px){.useless-grid{grid-template-columns:repeat(2,1fr)}.useless-readout{flex-direction:column;align-items:stretch}.meter{max-width:none}}
+</style>
+</head>
+<body>
+
+  <!-- SVG Filter for Dynamic Heat Wave Distortion -->
+  <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true">
+    <filter id="heat-filter">
+      <feTurbulence id="turbulence" type="fractalNoise" baseFrequency="0.02 0.07" numOctaves="3" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <div id="experience-root">
+    <!-- Ambient Vignette and Pulse Overlay -->
+    <div id="ambient-pulse"></div>
+
+    <!-- Heat distortion layer -->
+    <div id="distortion-overlay"></div>
+
+    <!-- Blizzard Frost Vignette -->
+    <div id="frost-overlay"></div>
+
+    <!-- 60FPS Particles & Waves Canvas -->
+    <canvas id="fx-canvas"></canvas>
+    <canvas id="environment-canvas" aria-hidden="true"></canvas>
+
+    <!-- Header Status -->
+    <header>
+      <div class="brand-title">Atmospheric Sensory Simulator</div>
+      <div class="state-indicator" id="status-display">
+        <span id="status-icon">⚪</span>
+        <span id="status-text">Standby</span>
+      </div>
+      <div class="mode-subtext" id="status-subtext">Click HEAT or COOL for maximum stadium sensory blast</div>
+    </header>
+
+    <!-- Center Stage Sensory Orb -->
+    <div class="center-stage">
+      <div class="orb-container">
+        <div class="ambient-orb" id="center-orb">✨</div>
+      </div>
+    </div>
+
+    <!-- Bottom Controls -->
+    
+    <div class="useless-panel" aria-label="Environmental Simulation Controls">
+      <div class="useless-title">🌍 Environmental Simulation Lab</div>
+      <div class="useless-grid">
+        <button class="useless-btn" data-useless="rain">🌧️ RAIN STORM</button>
+        <button class="useless-btn" data-useless="wind">💨 WIND FLOW</button>
+        <button class="useless-btn" data-useless="volcano">🌋 VOLCANIC ERUPTION</button>
+        <button class="useless-btn" data-useless="nothing">🧍 CALM MODE</button>
+      </div>
+      <div class="useless-readout">
+        <span id="fake-temp" class="fake-temp">Actual temperature: 0°C</span>
+        <span id="useless-label">Simulation intensity: 87%</span>
+        <span class="meter"><i id="useless-meter"></i></span>
+      </div>
+    </div>
+
+    <div class="useless-overlay" id="useless-overlay"></div>
+    <div class="controls-wrapper">
+      <div class="main-button-grid">
+        <button class="primary-btn heat-btn" id="btn-heat" aria-label="Activate Raging Inferno Mode">
+          <span class="btn-icon">🔥</span>
+          <span class="btn-label">HEAT</span>
+          <span class="btn-desc">Raging Inferno</span>
+        </button>
+
+        <button class="primary-btn cool-btn" id="btn-cool" aria-label="Activate Snow Storm Mode">
+          <span class="btn-icon">❄️</span>
+          <span class="btn-label">COOL</span>
+          <span class="btn-desc">Arctic Blizzard</span>
+        </button>
+      </div>
+
+      <div class="utility-bar">
+        <button class="stop-btn" id="btn-stop" title="Stop experience">
+          <span>⏹</span>
+          <span>STOP</span>
+        </button>
+        <button class="stop-btn" id="btn-voice" type="button" title="Start voice commands" aria-label="Start voice commands">
+          <span id="voice-icon">🎙️</span>
+          <span id="voice-label">VOICE</span>
+        </button>
+
+        <div class="volume-group">
+          <button class="volume-icon-btn" id="btn-mute" title="Mute / Unmute" aria-label="Toggle Mute">
+            <span id="volume-icon">📢</span>
+          </button>
+          <input type="range" class="volume-slider" id="volume-slider" min="0" max="2.0" step="0.02" value="1.5" aria-label="Stadium Volume">
+          <span class="volume-label" id="volume-text">STADIUM 150%</span>
+        </div>
+      </div>
+
+      <div class="voice-status" id="voice-status" aria-live="polite">Voice: click VOICE, then say “heat”, “cool”, “stop”, or “mute”.</div>
+
+      <div class="disclaimer">
+        Audiovisual & high-energy sensory simulation only. Does not physically alter hardware temperature.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ==========================================
+      // STATE MANAGEMENT
+      // ==========================================
+      const State = {
+        mode: 'OFF', // 'OFF' | 'HEAT' | 'COOL'
+        volume: 1.5, // High stadium output default
+        isMuted: false,
+        vibrationEnabled: 'vibrate' in navigator,
+        vibrationInterval: null
+      };
+
+      // ==========================================
+      // DOM ELEMENTS
+      // ==========================================
+      const body = document.body;
+      const root = document.getElementById('experience-root');
+      const canvas = document.getElementById('fx-canvas');
+      const ctx = canvas.getContext('2d');
+      const statusIcon = document.getElementById('status-icon');
+      const statusText = document.getElementById('status-text');
+      const statusSubtext = document.getElementById('status-subtext');
+      const centerOrb = document.getElementById('center-orb');
+      const btnHeat = document.getElementById('btn-heat');
+      const btnCool = document.getElementById('btn-cool');
+      const btnStop = document.getElementById('btn-stop');
+      const btnMute = document.getElementById('btn-mute');
+      const volumeSlider = document.getElementById('volume-slider');
+      const volumeIcon = document.getElementById('volume-icon');
+      const volumeText = document.getElementById('volume-text');
+      const svgTurbulence = document.getElementById('turbulence');
+
+      // ==========================================
+      // STADIUM-LOUD PROCEDURAL AUDIO SYSTEM
+      // Multi-layer saturation + brickwall compressor limiter
+      // ==========================================
+      let audioCtx = null;
+      let masterCompressor = null;
+      let masterGainNode = null;
+      let heatGainNode = null;
+      let coolGainNode = null;
+      let crackleTimer = null;
+      let gustLfoInterval = null;
+      let stormWhistleInterval = null;
+      let audioInitialized = false;
+
+      // Soft-clip distortion curve to prevent digital harsh clipping while maximizing acoustic pressure
+      function makeDistortionCurve(amount = 20) {
+        const k = typeof amount === 'number' ? amount : 50;
+        const n_samples = 44100;
+        const curve = new Float32Array(n_samples);
+        const deg = Math.PI / 180;
+        for (let i = 0; i < n_samples; ++i) {
+          const x = (i * 2) / n_samples - 1;
+          curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+        }
+        return curve;
+      }
+
+      function initAudio() {
+        if (audioInitialized) {
+          if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          return;
+        }
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        audioCtx = new AudioContextClass();
+
+        // 1. Master Brickwall Limiter & Dynamics Maximizer
+        masterCompressor = audioCtx.createDynamicsCompressor();
+        masterCompressor.threshold.setValueAtTime(-14, audioCtx.currentTime);
+        masterCompressor.knee.setValueAtTime(8, audioCtx.currentTime);
+        masterCompressor.ratio.setValueAtTime(18, audioCtx.currentTime);
+        masterCompressor.attack.setValueAtTime(0.002, audioCtx.currentTime);
+        masterCompressor.release.setValueAtTime(0.12, audioCtx.currentTime);
+
+        // 2. Master Gain Node (Stadium amplification)
+        masterGainNode = audioCtx.createGain();
+        masterGainNode.gain.setValueAtTime(State.volume, audioCtx.currentTime);
+
+        // Routing: Channels -> Master Gain -> Compressor -> Hardware Speakers
+        masterGainNode.connect(masterCompressor);
+        masterCompressor.connect(audioCtx.destination);
+
+        // 3. Heat & Cool Master Channel Gains
+        heatGainNode = audioCtx.createGain();
+        heatGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        heatGainNode.connect(masterGainNode);
+
+        coolGainNode = audioCtx.createGain();
+        coolGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        coolGainNode.connect(masterGainNode);
+
+        // Build procedural sound graphs
+        setupHeatSoundGraph();
+        setupCoolSoundGraph();
+
+        audioInitialized = true;
+      }
+
+      // Generate a looped 5-second Pink / Brown Noise Buffer
+      function createNoiseBuffer(type = 'pink') {
+        const bufferSize = audioCtx.sampleRate * 5;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        let lastOut = 0.0;
+
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          if (type === 'pink') {
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.16;
+            b6 = white * 0.115926;
+          } else if (type === 'brown') {
+            lastOut = (lastOut + (0.025 * white)) / 1.02;
+            data[i] = lastOut * 4.2;
+          } else {
+            data[i] = white * 0.35;
+          }
+        }
+        return buffer;
+      }
+
+      // --- RAGING INFERNO SOUND GRAPH ---
+      let fireSubRumble = null;
+      let fireRoarSource = null;
+      let fireDraftSource = null;
+
+      function setupHeatSoundGraph() {
+        const brownBuffer = createNoiseBuffer('brown');
+        const pinkBuffer = createNoiseBuffer('pink');
+
+        // Layer 1: Massive Sub-Bass Inferno Rumble (45Hz - 110Hz wall of fire)
+        fireSubRumble = audioCtx.createBufferSource();
+        fireSubRumble.buffer = brownBuffer;
+        fireSubRumble.loop = true;
+
+        const subFilter = audioCtx.createBiquadFilter();
+        subFilter.type = 'lowpass';
+        subFilter.frequency.setValueAtTime(110, audioCtx.currentTime);
+
+        const subGain = audioCtx.createGain();
+        subGain.gain.setValueAtTime(1.8, audioCtx.currentTime);
+
+        fireSubRumble.connect(subFilter);
+        subFilter.connect(subGain);
+        subGain.connect(heatGainNode);
+        fireSubRumble.start(0);
+
+        // Layer 2: Raging Burning Flame Roar (Mid-range combustion body)
+        fireRoarSource = audioCtx.createBufferSource();
+        fireRoarSource.buffer = brownBuffer;
+        fireRoarSource.loop = true;
+
+        const roarFilter = audioCtx.createBiquadFilter();
+        roarFilter.type = 'bandpass';
+        roarFilter.frequency.setValueAtTime(320, audioCtx.currentTime);
+        roarFilter.Q.setValueAtTime(1.6, audioCtx.currentTime);
+
+        const roarDistortion = audioCtx.createWaveShaper();
+        roarDistortion.curve = makeDistortionCurve(15);
+        roarDistortion.oversample = '2x';
+
+        const roarGain = audioCtx.createGain();
+        roarGain.gain.setValueAtTime(1.6, audioCtx.currentTime);
+
+        fireRoarSource.connect(roarFilter);
+        roarFilter.connect(roarDistortion);
+        roarDistortion.connect(roarGain);
+        roarGain.connect(heatGainNode);
+        fireRoarSource.start(0);
+
+        // Layer 3: High-convection Furnace Draft & Air Rush
+        fireDraftSource = audioCtx.createBufferSource();
+        fireDraftSource.buffer = pinkBuffer;
+        fireDraftSource.loop = true;
+
+        const draftFilter = audioCtx.createBiquadFilter();
+        draftFilter.type = 'bandpass';
+        draftFilter.frequency.setValueAtTime(850, audioCtx.currentTime);
+        draftFilter.Q.setValueAtTime(1.4, audioCtx.currentTime);
+
+        const draftGain = audioCtx.createGain();
+        draftGain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+
+        fireDraftSource.connect(draftFilter);
+        draftFilter.connect(draftGain);
+        draftGain.connect(heatGainNode);
+        fireDraftSource.start(0);
+      }
+
+      // Procedural Heavy Fire Sparks & Timber Fractures (Aggressive Loud Snaps)
+      function triggerFireCrackle() {
+        if (!audioCtx || State.mode !== 'HEAT') return;
+
+        const now = audioCtx.currentTime;
+        const isExplosionSnap = Math.random() < 0.35;
+
+        const osc = audioCtx.createOscillator();
+        const snapGain = audioCtx.createGain();
+        const snapFilter = audioCtx.createBiquadFilter();
+
+        if (isExplosionSnap) {
+          // Powerful exploding timber fracture
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(260 + Math.random() * 380, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.08);
+
+          snapFilter.type = 'lowpass';
+          snapFilter.frequency.setValueAtTime(1100, now);
+
+          snapGain.gain.setValueAtTime(1.1, now);
+          snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+          osc.connect(snapFilter);
+          snapFilter.connect(snapGain);
+          snapGain.connect(heatGainNode);
+
+          osc.start(now);
+          osc.stop(now + 0.1);
+        } else {
+          // Blazing loud sharp spark impulse
+          const snapBuffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.035), audioCtx.sampleRate);
+          const data = snapBuffer.getChannelData(0);
+          for (let i = 0; i < data.length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.22));
+          }
+          const snapSource = audioCtx.createBufferSource();
+          snapSource.buffer = snapBuffer;
+
+          snapFilter.type = 'bandpass';
+          snapFilter.frequency.setValueAtTime(1800 + Math.random() * 3600, now);
+          snapFilter.Q.setValueAtTime(4.0, now);
+
+          snapGain.gain.setValueAtTime(0.85 + Math.random() * 0.6, now);
+
+          snapSource.connect(snapFilter);
+          snapFilter.connect(snapGain);
+          snapGain.connect(heatGainNode);
+
+          snapSource.start(now);
+        }
+
+        // Fast, relentless crackling rhythm
+        const nextDelay = 25 + Math.random() * 140;
+        crackleTimer = setTimeout(triggerFireCrackle, nextDelay);
+      }
+
+      // --- ARCTIC BLIZZARD SOUND GRAPH ---
+      let stormGaleSource = null;
+      let stormGaleFilter = null;
+      let stormWhistleFilter = null;
+      let stormSubBassOsc = null;
+
+      function setupCoolSoundGraph() {
+        const pinkBuffer = createNoiseBuffer('pink');
+        const whiteBuffer = createNoiseBuffer('white');
+
+        // Layer 1: Screaming Gale-Force Wind Blast
+        stormGaleSource = audioCtx.createBufferSource();
+        stormGaleSource.buffer = pinkBuffer;
+        stormGaleSource.loop = true;
+
+        stormGaleFilter = audioCtx.createBiquadFilter();
+        stormGaleFilter.type = 'bandpass';
+        stormGaleFilter.frequency.setValueAtTime(450, audioCtx.currentTime);
+        stormGaleFilter.Q.setValueAtTime(2.2, audioCtx.currentTime);
+
+        const galeDistortion = audioCtx.createWaveShaper();
+        galeDistortion.curve = makeDistortionCurve(10);
+
+        const galeGain = audioCtx.createGain();
+        galeGain.gain.setValueAtTime(1.9, audioCtx.currentTime);
+
+        stormGaleSource.connect(stormGaleFilter);
+        stormGaleFilter.connect(galeDistortion);
+        galeDistortion.connect(galeGain);
+        galeGain.connect(coolGainNode);
+        stormGaleSource.start(0);
+
+        // Layer 2: Piercing Snowstorm Whistling Winds (Howling Tempest)
+        const whistleSource = audioCtx.createBufferSource();
+        whistleSource.buffer = whiteBuffer;
+        whistleSource.loop = true;
+
+        stormWhistleFilter = audioCtx.createBiquadFilter();
+        stormWhistleFilter.type = 'bandpass';
+        stormWhistleFilter.frequency.setValueAtTime(1250, audioCtx.currentTime);
+        stormWhistleFilter.Q.setValueAtTime(9.0, audioCtx.currentTime);
+
+        const whistleGain = audioCtx.createGain();
+        whistleGain.gain.setValueAtTime(0.75, audioCtx.currentTime);
+
+        whistleSource.connect(stormWhistleFilter);
+        stormWhistleFilter.connect(whistleGain);
+        whistleGain.connect(coolGainNode);
+        whistleSource.start(0);
+
+        // Layer 3: Blinding Sleet Hiss (High frequency ice particles slashing)
+        const sleetSource = audioCtx.createBufferSource();
+        sleetSource.buffer = whiteBuffer;
+        sleetSource.loop = true;
+
+        const sleetFilter = audioCtx.createBiquadFilter();
+        sleetFilter.type = 'highpass';
+        sleetFilter.frequency.setValueAtTime(3200, audioCtx.currentTime);
+
+        const sleetGain = audioCtx.createGain();
+        sleetGain.gain.setValueAtTime(0.65, audioCtx.currentTime);
+
+        sleetSource.connect(sleetFilter);
+        sleetFilter.connect(sleetGain);
+        sleetGain.connect(coolGainNode);
+        sleetSource.start(0);
+
+        // Layer 4: Deep Barometric Pressure Drone (Sub-bass rumble of the hurricane)
+        stormSubBassOsc = audioCtx.createOscillator();
+        stormSubBassOsc.type = 'sine';
+        stormSubBassOsc.frequency.setValueAtTime(52, audioCtx.currentTime);
+
+        const subBassGain = audioCtx.createGain();
+        subBassGain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+
+        stormSubBassOsc.connect(subBassGain);
+        subBassGain.connect(coolGainNode);
+        stormSubBassOsc.start(0);
+      }
+
+      // Dynamic Tempest Wind Modulations
+      function startBlizzardModulations() {
+        if (!audioCtx || !stormGaleFilter) return;
+
+        function applyNextGust() {
+          if (State.mode !== 'COOL') return;
+          const now = audioCtx.currentTime;
+          const gustTime = 1.0 + Math.random() * 2.2;
+          const targetFreq = 300 + Math.random() * 950;
+          stormGaleFilter.frequency.exponentialRampToValueAtTime(Math.max(160, targetFreq), now + gustTime);
+
+          // Random howling shift
+          if (stormWhistleFilter) {
+            const whistleTarget = 800 + Math.random() * 1800;
+            stormWhistleFilter.frequency.exponentialRampToValueAtTime(whistleTarget, now + (gustTime * 0.8));
+          }
+
+          gustLfoInterval = setTimeout(applyNextGust, (gustTime - 0.15) * 1000);
+        }
+
+        applyNextGust();
+      }
+
+      // Audio Crossfade Controller
+      function crossfadeAudio(targetMode) {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const rampTime = 0.9;
+
+        if (crackleTimer) {
+          clearTimeout(crackleTimer);
+          crackleTimer = null;
+        }
+        if (gustLfoInterval) {
+          clearTimeout(gustLfoInterval);
+          gustLfoInterval = null;
+        }
+
+        if (targetMode === 'HEAT') {
+          heatGainNode.gain.cancelScheduledValues(now);
+          heatGainNode.gain.setValueAtTime(heatGainNode.gain.value, now);
+          heatGainNode.gain.linearRampToValueAtTime(1.0, now + rampTime);
+
+          coolGainNode.gain.cancelScheduledValues(now);
+          coolGainNode.gain.setValueAtTime(coolGainNode.gain.value, now);
+          coolGainNode.gain.linearRampToValueAtTime(0.0, now + rampTime);
+
+          triggerFireCrackle();
+        } else if (targetMode === 'COOL') {
+          coolGainNode.gain.cancelScheduledValues(now);
+          coolGainNode.gain.setValueAtTime(coolGainNode.gain.value, now);
+          coolGainNode.gain.linearRampToValueAtTime(1.0, now + rampTime);
+
+          heatGainNode.gain.cancelScheduledValues(now);
+          heatGainNode.gain.setValueAtTime(heatGainNode.gain.value, now);
+          heatGainNode.gain.linearRampToValueAtTime(0.0, now + rampTime);
+
+          startBlizzardModulations();
+        } else {
+          heatGainNode.gain.cancelScheduledValues(now);
+          heatGainNode.gain.setValueAtTime(heatGainNode.gain.value, now);
+          heatGainNode.gain.linearRampToValueAtTime(0.0, now + 0.6);
+
+          coolGainNode.gain.cancelScheduledValues(now);
+          coolGainNode.gain.setValueAtTime(coolGainNode.gain.value, now);
+          coolGainNode.gain.linearRampToValueAtTime(0.0, now + 0.6);
+        }
+      }
+
+      // ==========================================
+      // HAPTIC VIBRATION ENGINE (Heavy Stadium Pulses)
+      // ==========================================
+      function stopVibration() {
+        if (State.vibrationInterval) {
+          clearInterval(State.vibrationInterval);
+          State.vibrationInterval = null;
+        }
+        if (State.vibrationEnabled) {
+          try {
+            navigator.vibrate(0);
+          } catch (e) {}
+        }
+      }
+
+      function startVibration(mode) {
+        stopVibration();
+        if (!State.vibrationEnabled) return;
+
+        try {
+          if (mode === 'HEAT') {
+            // Intense crackle and flame thumps
+            navigator.vibrate([60, 40, 90, 30, 120]);
+            State.vibrationInterval = setInterval(() => {
+              if (Math.random() < 0.75) {
+                navigator.vibrate([40, 50, 100, 30, 60]);
+              }
+            }, 400);
+          } else if (mode === 'COOL') {
+            // Violent blizzard shudder
+            navigator.vibrate([30, 20, 30, 20, 45, 15, 60]);
+            State.vibrationInterval = setInterval(() => {
+              navigator.vibrate([25, 25, 35, 15, 45]);
+            }, 320);
+          }
+        } catch (e) {}
+      }
+
+      // ==========================================
+      // HIGH DENSITY CANVAS SIMULATION
+      // Real Burning Fire Flames & Blinding Blizzard
+      // ==========================================
+      let width = 0;
+      let height = 0;
+      let fireParticles = [];
+      let emberParticles = [];
+      let blizzardParticles = [];
+      let mistParticles = [];
+
+      const FIRE_COUNT = 140;
+      const EMBER_COUNT = 55;
+      const BLIZZARD_COUNT = 280;
+      const MIST_COUNT = 45;
+
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.resetTransform();
+        ctx.scale(dpr, dpr);
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      // --- 1. RAGING FIRE TONGUE PARTICLE ---
+      class FireTongue {
+        constructor() {
+          this.reset(true);
+        }
+
+        reset(randomY = false) {
+          this.x = (width * 0.5) + (Math.random() - 0.5) * (width * 0.75);
+          this.y = randomY ? height - Math.random() * (height * 0.45) : height + 15;
+          this.vx = (Math.random() - 0.5) * 2.8;
+          this.vy = -(3.5 + Math.random() * 6.5);
+          this.life = 0;
+          this.maxLife = 40 + Math.random() * 55;
+          this.baseRadius = 18 + Math.random() * 32;
+          this.radius = this.baseRadius;
+        }
+
+        update() {
+          this.life++;
+          this.x += this.vx + Math.sin(this.life * 0.12) * 1.5;
+          this.y += this.vy;
+          this.vy *= 0.98; // gentle deceleration as it billows up
+
+          const progress = this.life / this.maxLife;
+          this.radius = this.baseRadius * (1 - progress * 0.85);
+
+          if (this.life >= this.maxLife || this.y < -50) {
+            if (State.mode === 'HEAT') {
+              this.reset(false);
+            }
+          }
+        }
+
+        draw(targetCtx) {
+          if (State.mode !== 'HEAT' && this.life >= this.maxLife) return;
+
+          const progress = this.life / this.maxLife;
+          let r, g, b, a;
+
+          // Burning incandescent flame gradient: white-hot -> bright yellow -> vivid orange -> deep fiery crimson
+          if (progress < 0.2) {
+            r = 255; g = 245; b = 200; a = 0.85;
+          } else if (progress < 0.5) {
+            r = 255; g = 175; b = 15; a = 0.75;
+          } else if (progress < 0.8) {
+            r = 255; g = 65; b = 0; a = 0.55;
+          } else {
+            r = 180; g = 20; b = 0; a = 0.25;
+          }
+
+          const grad = targetCtx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+          grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${a})`);
+          grad.addColorStop(0.5, `rgba(${r}, ${Math.floor(g * 0.6)}, 0, ${a * 0.5})`);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+          targetCtx.fillStyle = grad;
+          targetCtx.beginPath();
+          targetCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          targetCtx.fill();
+        }
+      }
+
+      // --- 2. FLOATING EMBER & SPARK PARTICLE ---
+      class Ember {
+        constructor() {
+          this.reset(true);
+        }
+
+        reset(randomY = false) {
+          this.x = (width * 0.5) + (Math.random() - 0.5) * (width * 0.85);
+          this.y = randomY ? Math.random() * height : height + 10;
+          this.vx = (Math.random() - 0.5) * 3.5;
+          this.vy = -(2.5 + Math.random() * 5.5);
+          this.size = 1.8 + Math.random() * 3.2;
+          this.life = 0;
+          this.maxLife = 70 + Math.random() * 110;
+          this.alpha = 1;
+        }
+
+        update() {
+          this.life++;
+          this.x += this.vx + (Math.random() - 0.5) * 1.2;
+          this.y += this.vy;
+          this.vy -= 0.015; // upward buoyant acceleration
+
+          const progress = this.life / this.maxLife;
+          this.alpha = 1 - progress;
+
+          if (this.life >= this.maxLife || this.y < -20) {
+            if (State.mode === 'HEAT') {
+              this.reset(false);
+            }
+          }
+        }
+
+        draw(targetCtx) {
+          if (State.mode !== 'HEAT' && this.alpha <= 0) return;
+          targetCtx.fillStyle = `rgba(255, ${Math.floor(180 + Math.random() * 70)}, 50, ${this.alpha})`;
+          targetCtx.shadowBlur = 0;
+          targetCtx.beginPath();
+          targetCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          targetCtx.fill();
+        }
+      }
+
+      // --- 3. BLIZZARD SLEET & SNOWDRIFT PARTICLE ---
+      class BlizzardStreak {
+        constructor() {
+          this.reset(true);
+        }
+
+        reset(randomX = false) {
+          this.x = randomX ? Math.random() * (width + 300) - 200 : -50;
+          this.y = Math.random() * (height + 100) - 50;
+          // Gale force horizontal velocity
+          this.vx = 22 + Math.random() * 26;
+          this.vy = 4 + Math.random() * 8;
+          this.length = 40 + Math.random() * 85;
+          this.thickness = 1.2 + Math.random() * 2.8;
+          this.alpha = 0.35 + Math.random() * 0.65;
+          this.life = 0;
+          this.maxLife = 90 + Math.random() * 80;
+        }
+
+        update() {
+          this.life++;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          if (this.x > width + 100 || this.y > height + 60 || this.life >= this.maxLife) {
+            if (State.mode === 'COOL') {
+              this.reset(false);
+            }
+          }
+        }
+
+        draw(targetCtx) {
+          if (State.mode !== 'COOL') return;
+          targetCtx.strokeStyle = `rgba(220, 245, 255, ${this.alpha})`;
+          targetCtx.lineWidth = this.thickness;
+          targetCtx.lineCap = 'round';
+          targetCtx.beginPath();
+          targetCtx.moveTo(this.x, this.y);
+          targetCtx.lineTo(this.x + this.length, this.y + (this.vy * 2.5));
+          targetCtx.stroke();
+        }
+      }
+
+      // --- 4. BLIZZARD FOG & SNOW FLUFF MIST ---
+      class StormMist {
+        constructor() {
+          this.reset(true);
+        }
+
+        reset(randomX = false) {
+          this.x = randomX ? Math.random() * width : -120;
+          this.y = Math.random() * height;
+          this.vx = 8 + Math.random() * 14;
+          this.vy = 1 + Math.random() * 3;
+          this.radius = 45 + Math.random() * 95;
+          this.alpha = 0.08 + Math.random() * 0.16;
+          this.life = 0;
+          this.maxLife = 120 + Math.random() * 100;
+        }
+
+        update() {
+          this.life++;
+          this.x += this.vx;
+          this.y += this.vy;
+
+          if (this.x > width + 150 || this.life >= this.maxLife) {
+            if (State.mode === 'COOL') {
+              this.reset(false);
+            }
+          }
+        }
+
+        draw(targetCtx) {
+          if (State.mode !== 'COOL') return;
+          const grad = targetCtx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+          grad.addColorStop(0, `rgba(200, 240, 255, ${this.alpha})`);
+          grad.addColorStop(0.6, `rgba(160, 220, 255, ${this.alpha * 0.4})`);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+          targetCtx.fillStyle = grad;
+          targetCtx.beginPath();
+          targetCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          targetCtx.fill();
+        }
+      }
+
+      // Instantiate particle systems
+      for (let i = 0; i < FIRE_COUNT; i++) fireParticles.push(new FireTongue());
+      for (let i = 0; i < EMBER_COUNT; i++) emberParticles.push(new Ember());
+      for (let i = 0; i < BLIZZARD_COUNT; i++) blizzardParticles.push(new BlizzardStreak());
+      for (let i = 0; i < MIST_COUNT; i++) mistParticles.push(new StormMist());
+
+      // Master 60fps Animation Loop
+      let svgTime = 0;
+      let frameCounter = 0;
+      function renderLoop() {
+        ctx.clearRect(0, 0, width, height);
+        frameCounter++;
+
+        if (State.mode === 'HEAT') {
+          // Additive blending for incandescent burning core
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+
+          for (let i = 0; i < fireParticles.length; i++) {
+            fireParticles[i].update();
+            fireParticles[i].draw(ctx);
+          }
+          for (let i = 0; i < emberParticles.length; i++) {
+            emberParticles[i].update();
+            emberParticles[i].draw(ctx);
+          }
+          ctx.restore();
+
+          // Lightweight heat haze: update the SVG filter only every 6 frames.
+          // Updating SVG filter attributes every frame is surprisingly expensive.
+          if (frameCounter % 6 === 0) {
+            svgTime += 0.12;
+            const fx = 0.018 + Math.sin(svgTime * 0.8) * 0.003;
+            const fy = 0.060 + Math.cos(svgTime * 1.1) * 0.008;
+            svgTurbulence.setAttribute('baseFrequency', `${fx} ${fy}`);
+          }
+
+        } else if (State.mode === 'COOL') {
+          // Render dense storm fog mist
+          ctx.save();
+          for (let i = 0; i < mistParticles.length; i++) {
+            mistParticles[i].update();
+            mistParticles[i].draw(ctx);
+          }
+
+          // Render high velocity blizzard streaks
+          for (let i = 0; i < blizzardParticles.length; i++) {
+            blizzardParticles[i].update();
+            blizzardParticles[i].draw(ctx);
+          }
+          ctx.restore();
+        }
+
+        requestAnimationFrame(renderLoop);
+      }
+      requestAnimationFrame(renderLoop);
+
+      // ==========================================
+      // MODE CONTROLLER
+      // ==========================================
+      function setMode(newMode) {
+        if (State.mode === newMode && newMode !== 'OFF') {
+          setMode('OFF');
+          return;
+        }
+
+        initAudio();
+        State.mode = newMode;
+
+        body.classList.remove('heat-active', 'cool-active');
+
+        if (newMode === 'HEAT') {
+          body.classList.add('heat-active');
+          root.style.setProperty('--mode-color-glow', 'rgba(255, 60, 0, 0.7)');
+          root.style.setProperty('--mode-accent', '#ff4d00');
+          root.style.setProperty('--mode-bg-gradient', 'radial-gradient(circle at bottom center, #6b1602 0%, #290802 50%, #080201 100%)');
+          root.style.setProperty('--hud-text', '#ffe0cc');
+
+          statusIcon.textContent = '🔥';
+          statusText.textContent = 'Raging Inferno Active';
+          statusSubtext.textContent = 'Blazing Heat: 58°C / 136°F • Stadium Furnace Combustion';
+          centerOrb.textContent = '🔥';
+
+          fireParticles.forEach(p => p.reset(true));
+          emberParticles.forEach(p => p.reset(true));
+          startVibration('HEAT');
+          crossfadeAudio('HEAT');
+
+        } else if (newMode === 'COOL') {
+          body.classList.add('cool-active');
+          root.style.setProperty('--mode-color-glow', 'rgba(0, 210, 255, 0.65)');
+          root.style.setProperty('--mode-accent', '#00d0ff');
+          root.style.setProperty('--mode-bg-gradient', 'radial-gradient(circle at top center, #063968 0%, #031d36 50%, #020b14 100%)');
+          root.style.setProperty('--hud-text', '#d8f7ff');
+
+          statusIcon.textContent = '❄️';
+          statusText.textContent = 'Arctic Blizzard Active';
+          statusSubtext.textContent = 'Sub-Zero Gale: -25°C / -13°F • Blinding Snow Tempest';
+          centerOrb.textContent = '❄️';
+
+          blizzardParticles.forEach(p => p.reset(true));
+          mistParticles.forEach(p => p.reset(true));
+          startVibration('COOL');
+          crossfadeAudio('COOL');
+
+        } else {
+          // OFF / STANDBY
+          root.style.setProperty('--mode-color-glow', 'rgba(0, 0, 0, 0)');
+          root.style.setProperty('--mode-accent', '#888888');
+          root.style.setProperty('--mode-bg-gradient', 'radial-gradient(circle at center, #14171d 0%, #08090b 100%)');
+          root.style.setProperty('--hud-text', '#ffffff');
+
+          statusIcon.textContent = '⚪';
+          statusText.textContent = 'Standby';
+          statusSubtext.textContent = 'Select HEAT or COOL for maximum stadium sensory blast';
+          centerOrb.textContent = '✨';
+
+          stopVibration();
+          crossfadeAudio('OFF');
+        }
+      }
+
+      // ==========================================
+      // CONTROLS & EVENT LISTENERS
+      // ==========================================
+      btnHeat.addEventListener('click', () => setMode('HEAT'));
+      btnCool.addEventListener('click', () => setMode('COOL'));
+      btnStop.addEventListener('click', () => setMode('OFF'));
+
+      // Stadium Volume Slider (Amplifies up to 200%)
+      volumeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        State.volume = val;
+        if (State.isMuted && val > 0) {
+          State.isMuted = false;
+        }
+        updateVolumeDisplay();
+      });
+
+      // Mute Toggle
+      btnMute.addEventListener('click', () => {
+        State.isMuted = !State.isMuted;
+        updateVolumeDisplay();
+      });
+
+      function updateVolumeDisplay() {
+        if (!masterGainNode || !audioCtx) return;
+        const effectiveVol = State.isMuted ? 0 : State.volume;
+        masterGainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+        masterGainNode.gain.setValueAtTime(masterGainNode.gain.value, audioCtx.currentTime);
+        masterGainNode.gain.linearRampToValueAtTime(effectiveVol, audioCtx.currentTime + 0.06);
+
+        const percentage = Math.round(State.volume * 100);
+        if (State.isMuted || effectiveVol === 0) {
+          volumeIcon.textContent = '🔇';
+          volumeText.textContent = 'MUTED';
+        } else if (effectiveVol > 1.2) {
+          volumeIcon.textContent = '📢';
+          volumeText.textContent = `STADIUM ${percentage}%`;
+        } else if (effectiveVol > 0.6) {
+          volumeIcon.textContent = '🔊';
+          volumeText.textContent = `LOUD ${percentage}%`;
+        } else {
+          volumeIcon.textContent = '🔉';
+          volumeText.textContent = `${percentage}%`;
+        }
+      }
+
+      // Keyboard Controls
+      window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const k = e.key.toLowerCase();
+        if (k === 'h') setMode('HEAT');
+        if (k === 'c') setMode('COOL');
+        if (k === ' ' || k === 'escape') {
+          e.preventDefault();
+          setMode(State.mode === 'OFF' ? 'HEAT' : 'OFF');
+        }
+        if (k === 'm') {
+          State.isMuted = !State.isMuted;
+          updateVolumeDisplay();
+        }
+      });
+
+      // Handle Tab Visibility
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          stopVibration();
+        } else if (State.mode !== 'OFF') {
+          startVibration(State.mode);
+        }
+      });
+
+      // ==========================================
+      // ROBUST VOICE COMMAND CONTROLLER
+      // Browser Speech Recognition (no external API)
+      // ==========================================
+      const voiceButton = document.getElementById('btn-voice');
+      const voiceIcon = document.getElementById('voice-icon');
+      const voiceLabel = document.getElementById('voice-label');
+      const voiceStatus = document.getElementById('voice-status');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let isListening = false;
+      let manualStop = false;
+      let restartTimer = null;
+
+      function setVoiceUI(listening, message) {
+        isListening = listening;
+        voiceButton.classList.toggle('listening', listening);
+        voiceIcon.textContent = listening ? '🔴' : '🎙️';
+        voiceLabel.textContent = listening ? 'LISTENING' : 'VOICE';
+        voiceStatus.textContent = message;
+      }
+
+      function normalizeVoiceText(text) {
+        return text.toLowerCase().trim().replace(/[^a-z0-9\s]/g, ' ');
+      }
+
+      function handleVoiceCommand(text) {
+        const command = normalizeVoiceText(text);
+        if (!command) return;
+
+        // Most-specific commands first.
+        if (/\b(stop|standby|off|turn off)\b/.test(command)) {
+          setMode('OFF');
+          setVoiceUI(isListening, 'Voice command: STOP');
+          return;
+        }
+        if (/\b(mute|silence|quiet)\b/.test(command)) {
+          if (!State.isMuted) State.isMuted = true;
+          updateVolumeDisplay();
+          setVoiceUI(isListening, 'Voice command: MUTE');
+          return;
+        }
+        if (/\b(unmute|sound on|volume on)\b/.test(command)) {
+          State.isMuted = false;
+          if (State.volume <= 0) State.volume = 0.5;
+          volumeSlider.value = String(State.volume);
+          updateVolumeDisplay();
+          setVoiceUI(isListening, 'Voice command: UNMUTE');
+          return;
+        }
+        if (/\b(heat|hot|warm|increase|increase temperature|make it hot)\b/.test(command)) {
+          if (State.mode !== 'HEAT') setMode('HEAT');
+          setVoiceUI(isListening, 'Voice command: HEAT');
+          return;
+        }
+        if (/\b(cool|cold|chill|decrease|decrease temperature|make it cold)\b/.test(command)) {
+          if (State.mode !== 'COOL') setMode('COOL');
+          setVoiceUI(isListening, 'Voice command: COOL');
+          return;
+        }
+        if (/\b(rain|rain storm|rainstorm)\b/.test(command)) {
+          window.activateEnvironmentalMode('rain');
+          setVoiceUI(isListening, 'Voice command: RAIN STORM');
+          return;
+        }
+        if (/\b(wind|wind flow)\b/.test(command)) {
+          window.activateEnvironmentalMode('wind');
+          setVoiceUI(isListening, 'Voice command: WIND FLOW');
+          return;
+        }
+        if (/\b(volcano|volcanic|eruption)\b/.test(command)) {
+          window.activateEnvironmentalMode('volcano');
+          setVoiceUI(isListening, 'Voice command: VOLCANO');
+          return;
+        }
+        if (/\b(calm|nothing|calm mode)\b/.test(command)) {
+          window.activateEnvironmentalMode('nothing');
+          setVoiceUI(isListening, 'Voice command: CALM');
+          return;
+        }
+
+        setVoiceUI(isListening, 'Heard: “' + text + '” — command not recognized.');
+      }
+
+      function stopRecognition() {
+        manualStop = true;
+        if (restartTimer) {
+          clearTimeout(restartTimer);
+          restartTimer = null;
+        }
+        if (recognition) {
+          try { recognition.stop(); } catch (e) {}
+        }
+        setVoiceUI(false, 'Voice control stopped.');
+      }
+
+      function startRecognition() {
+        if (!recognition) return;
+        manualStop = false;
+        try {
+          recognition.start();
+        } catch (e) {
+          // Calling start while already listening throws in some browsers.
+          if (e && e.name === 'InvalidStateError') return;
+          setVoiceUI(false, 'Could not start voice control. Try again.');
+        }
+      }
+
+      if (!SpeechRecognition) {
+        voiceButton.classList.add('unsupported');
+        voiceButton.disabled = true;
+        setVoiceUI(false, 'Voice commands are not supported by this browser. Use Chrome or Edge.');
+      } else {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 3;
+
+        recognition.onstart = () => {
+          setVoiceUI(true, 'Listening… say “heat”, “cool”, “stop”, “mute”, “rain”, “wind”, or “volcano”.');
+        };
+
+        recognition.onresult = (event) => {
+          let finalText = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) finalText += event.results[i][0].transcript + ' ';
+          }
+          if (finalText.trim()) handleVoiceCommand(finalText.trim());
+        };
+
+        recognition.onerror = (event) => {
+          const errors = {
+            'not-allowed': 'Microphone permission was denied. Allow microphone access and try again.',
+            'service-not-allowed': 'Speech recognition service is blocked by the browser.',
+            'no-speech': 'No speech detected. Click VOICE and try again.',
+            'audio-capture': 'No microphone was found. Check your microphone.',
+            'network': 'Speech recognition needs a network connection in this browser.',
+            'aborted': 'Voice listening stopped.'
+          };
+          setVoiceUI(false, errors[event.error] || 'Voice error: ' + event.error);
+        };
+
+        recognition.onend = () => {
+          isListening = false;
+          voiceButton.classList.remove('listening');
+          voiceIcon.textContent = '🎙️';
+          voiceLabel.textContent = 'VOICE';
+
+          // Do not auto-restart after errors or a manual stop.
+          // A fresh click starts a new microphone session.
+          if (!manualStop) {
+            voiceStatus.textContent = 'Voice session ended. Click VOICE to listen again.';
+          }
+        };
+
+        voiceButton.addEventListener('click', () => {
+          if (isListening) stopRecognition();
+          else startRecognition();
+        });
+      }
+
+    })();
+  </script>
+
+<script>
+/* =========================================================
+   ENVIRONMENTAL SIMULATION PACK
+   Smooth canvas-based rain, wind and volcanic eruption FX.
+   Everything stays inside the browser; no hardware changes.
+   ========================================================= */
+(function(){
+  const root=document.getElementById('experience-root');
+  const statusText=document.getElementById('status-text');
+  const statusSub=document.getElementById('status-subtext');
+  const fakeTemp=document.getElementById('fake-temp');
+  const intensityLabel=document.getElementById('useless-label');
+  const meter=document.getElementById('useless-meter');
+  const canvas=document.getElementById('environment-canvas');
+  const ctx=canvas.getContext('2d',{alpha:true});
+  const buttons=document.querySelectorAll('[data-useless]');
+  let width=innerWidth,height=innerHeight,dpr=1,mode='OFF',raf=0,last=0,particles=[];
+  const data={
+    rain:{icon:'🌧️',name:'Rain Storm Simulation',temp:17,text:'Heavy rain is falling across the simulated environment.',intensity:78},
+    wind:{icon:'💨',name:'Dynamic Wind Simulation',temp:24,text:'Fast-moving air currents are sweeping across the scene.',intensity:72},
+    volcano:{icon:'🌋',name:'Volcanic Eruption Simulation',temp:999,text:'Lava, smoke and hot ash are erupting from the virtual volcano.',intensity:96},
+    nothing:{icon:'🧍',name:'Calm Environment',temp:24,text:'Environmental effects are paused.',intensity:8}
+  };
+  function resize(){
+    dpr=Math.min(devicePixelRatio||1,1.5); width=innerWidth;height=innerHeight;
+    canvas.width=width*dpr;canvas.height=height*dpr;canvas.style.width=width+'px';canvas.style.height=height+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  addEventListener('resize',resize);resize();
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  function resetParticles(){particles=[]; const count=mode==='rain'?Math.min(420,Math.floor(width/3)):mode==='wind'?110:mode==='volcano'?220:0;
+    for(let i=0;i<count;i++) spawn(particles,i,true);
+  }
+  function spawn(p,i,initial){
+    if(mode==='rain'){
+      p.x=rand(-50,width+50);p.y=initial?rand(-height,height):rand(-80,-10);p.vx=rand(-1.8,.8);p.vy=rand(18,30);p.len=rand(12,26);p.a=rand(.18,.55);p.w=rand(.7,1.6);
+    } else if(mode==='wind'){
+      p.x=initial?rand(-50,width+50):rand(-140,-10);p.y=rand(70,height-90);p.vx=rand(7,15);p.vy=rand(-.25,.25);p.len=rand(40,130);p.a=rand(.08,.35);p.w=rand(.7,1.8);p.phase=rand(0,Math.PI*2);
+    } else if(mode==='volcano'){
+      const cx=width*.5, ground=height*.84; p.x=cx+rand(-42,42);p.y=ground-rand(0,18);p.vx=rand(-2.8,2.8);p.vy=rand(-13,-5);p.life=rand(.3,1);p.max=rand(1.1,2.4);p.size=rand(2,7);p.type=Math.random()<.22?'smoke':'ember';
+    }
+  }
+  function clear(){ctx.clearRect(0,0,width,height)}
+  function drawRain(dt){
+    ctx.lineCap='round';
+    for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.y>height+40||p.x>width+60){spawn(p,0,false)}
+      ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+p.vx*1.5,p.y+p.len);ctx.lineWidth=p.w;ctx.strokeStyle=`rgba(150,205,255,${p.a})`;ctx.stroke();
+    }
+    const g=ctx.createLinearGradient(0,0,0,height);g.addColorStop(0,'rgba(70,120,170,.02)');g.addColorStop(1,'rgba(20,55,90,.16)');ctx.fillStyle=g;ctx.fillRect(0,0,width,height);
+  }
+  function drawWind(t,dt){
+    ctx.lineCap='round';
+    for(const p of particles){p.x+=p.vx*dt;p.y+=Math.sin(t*.003+p.phase)*.18;p.vx+=Math.sin(t*.001+p.phase)*.002;if(p.x>width+160)spawn(p,0,false);
+      const bend=Math.sin(t*.002+p.phase)*12;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.quadraticCurveTo(p.x+p.len*.45,p.y+bend,p.x+p.len,p.y+bend*.35);ctx.lineWidth=p.w;ctx.strokeStyle=`rgba(205,235,255,${p.a})`;ctx.stroke();
+    }
+    for(let i=0;i<8;i++){const y=height*.22+i*height*.08+Math.sin(t*.001+i)*20;ctx.beginPath();ctx.moveTo(-20,y);ctx.bezierCurveTo(width*.25,y-30,width*.55,y+35,width+30,y-5);ctx.strokeStyle='rgba(160,215,255,.06)';ctx.lineWidth=2;ctx.stroke()}
+  }
+  function drawVolcano(t,dt){
+    const cx=width*.5,base=height*.88,top=height*.68;
+    // Distant smoke cloud
+    const glow=ctx.createRadialGradient(cx,top,10,cx,top,Math.min(width,height)*.32);glow.addColorStop(0,'rgba(255,100,20,.30)');glow.addColorStop(1,'rgba(255,40,0,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,width,height);
+    ctx.fillStyle='rgba(22,12,10,.75)';ctx.beginPath();ctx.moveTo(cx-190,base+20);ctx.lineTo(cx-105,top+45);ctx.quadraticCurveTo(cx-45,top+5,cx,top);ctx.quadraticCurveTo(cx+45,top+5,cx+105,top+45);ctx.lineTo(cx+190,base+20);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(255,75,0,.8)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(cx-80,base);ctx.quadraticCurveTo(cx-35,top+55,cx-10,top+5);ctx.quadraticCurveTo(cx+8,top+55,cx+45,base);ctx.stroke();
+    for(const p of particles){p.life-=dt/p.max;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+= (p.type==='smoke'?1.5:6)*dt;p.vx+=Math.sin(t*.002+p.x)*.025;
+      if(p.life<=0||p.y<top-height*.35){spawn(p,0,false);continue}
+      if(p.type==='smoke'){ctx.beginPath();ctx.arc(p.x,p.y,p.size*(1.5+p.life),0,Math.PI*2);ctx.fillStyle=`rgba(80,80,80,${.08+p.life*.16})`;ctx.fill()}
+      else{ctx.beginPath();ctx.arc(p.x,p.y,p.size*(.5+p.life),0,Math.PI*2);ctx.fillStyle=`rgba(255,${Math.floor(70+140*p.life)},${Math.floor(10+35*p.life)},${Math.min(1,p.life+.2)})`;ctx.fill()}
+    }
+    const pulse=.5+.5*Math.sin(t*.009);ctx.fillStyle=`rgba(255,80,0,${.04+.06*pulse})`;ctx.fillRect(0,0,width,height);
+  }
+  function animate(t){
+    const dt=Math.min((t-last)/1000,.035)||.016;last=t;clear();
+    if(mode==='rain')drawRain(dt);else if(mode==='wind')drawWind(t,dt);else if(mode==='volcano')drawVolcano(t,dt);
+    if(mode!=='OFF')raf=requestAnimationFrame(animate);
+  }
+  function stopAnim(){if(raf){cancelAnimationFrame(raf);raf=0}}
+  function clearModes(){document.body.classList.remove('rain-mode','wind-mode','volcano-mode','nothing-mode','heat-active','cool-active');stopAnim();clear()}
+  window.activateEnvironmentalMode=function(m){clearModes();mode=m;document.body.classList.add(m+'-mode');const d=data[m];
+    statusText.textContent=d.name;statusSub.textContent=d.text;fakeTemp.textContent='Simulated temperature: '+d.temp+'°C';intensityLabel.textContent='Simulation intensity: '+d.intensity+'%';meter.style.width=d.intensity+'%';resetParticles();last=performance.now();
+    if(m!=='nothing'){raf=requestAnimationFrame(animate)}
+  }
+  buttons.forEach(b=>b.addEventListener('click',()=>window.activateEnvironmentalMode(b.dataset.useless)));
+  const stop=document.getElementById('btn-stop');if(stop)stop.addEventListener('click',()=>{mode='OFF';clearModes();statusText.textContent='Standby';statusSub.textContent='Nothing is happening. Perfect.';fakeTemp.textContent='Actual temperature: unchanged';intensityLabel.textContent='Simulation intensity: 87%';meter.style.width='87%'});
+  root.addEventListener('dblclick',()=>{intensityLabel.textContent='Simulation intensity: 100%';meter.style.width='100%';statusText.textContent='MAXIMUM ENVIRONMENTAL INTENSITY';statusSub.textContent='All visual simulation systems are operating at maximum intensity.'});
+})();
+</script>
+</body>
+</html>
