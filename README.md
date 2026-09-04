@@ -37,13 +37,16 @@ For Software:
 For Software:
 
 # Screenshots (Add at least 3)
-![Screenshot1](Add screenshot 1 here with proper name)
+!<img width="1887" height="878" alt="Screenshot 2026-09-04 075736" src="https://github.com/user-attachments/assets/c06ff89f-1b8e-4b4a-ac43-bc1690240032" />
+(Add screenshot 1 here with proper name)
 *Add caption explaining what this shows*
 
-![Screenshot2](Add screenshot 2 here with proper name)
+<img width="1877" height="883" alt="Screenshot 2026-09-04 075807" src="https://github.com/user-attachments/assets/751abd88-f6ae-4cbd-9a67-4a55b619cf1b" />
+(Add screenshot 2 here with proper name)
 *Add caption explaining what this shows*
 
-![Screenshot3](Add screenshot 3 here with proper name)
+<img width="1887" height="886" alt="Screenshot 2026-09-04 075831" src="https://github.com/user-attachments/assets/4c7f8658-3052-4d72-999d-fd0c6ab12fe9" />
+(Add screenshot 3 here with proper name)
 *Add caption explaining what this shows*
 
 # Diagrams
@@ -78,7 +81,9 @@ For Hardware:
 [Add any extra demo materials/links]
 
 Team Contributions
+
 Rohit Rajesh: Mastermind of procedural sound synthesis (pink/brown noise oscillators, soft-clip wave shapers, and dynamic wind modulation filters) and high-level architecture design.  
+
 Alen Jos Babu: Visual particle storm engine (buoyant embers, high-velocity blizzard streaks), dynamic SVG displacement filters, and haptic feedback choreography. 
 ---
 Made with ❤️ at TinkerHub Useless Projects 
