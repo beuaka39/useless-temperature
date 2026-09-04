@@ -150,7 +150,7 @@ Team Contributions
 Rohit Rajesh: Mastermind of procedural sound synthesis (pink/brown noise oscillators, soft-clip wave shapers, and dynamic wind modulation filters) and high-level architecture design.  
 
 Alen Jos Babu: Visual particle storm engine (buoyant embers, high-velocity blizzard streaks), dynamic SVG displacement filters, and haptic feedback choreography. 
----
+
 Made with ❤️ at TinkerHub Useless Projects 
 
 ![Static Badge](https://img.shields.io/badge/TinkerHub-24?color=%23000000&link=https%3A%2F%2Fwww.tinkerhub.org%2F)
