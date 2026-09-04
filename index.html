@@ -1553,7 +1553,7 @@ body.volcano-mode #experience-root{animation:volcanoScreen 1.8s ease-in-out infi
         // Most-specific commands first.
         if (/\b(stop|standby|off|turn off)\b/.test(command)) {
           setMode('OFF');
-          setVoiceUI(isListening, 'Voice command: STOP');
+          stopRecognition();
           return;
         }
         if (/\b(mute|silence|quiet)\b/.test(command)) {
@@ -1635,7 +1635,7 @@ body.volcano-mode #experience-root{animation:volcanoScreen 1.8s ease-in-out infi
       } else {
         recognition = new SpeechRecognition();
         recognition.lang = 'en-IN';
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = false;
         recognition.maxAlternatives = 3;
 
@@ -1655,24 +1655,37 @@ body.volcano-mode #experience-root{animation:volcanoScreen 1.8s ease-in-out infi
           const errors = {
             'not-allowed': 'Microphone permission was denied. Allow microphone access and try again.',
             'service-not-allowed': 'Speech recognition service is blocked by the browser.',
-            'no-speech': 'No speech detected. Click VOICE and try again.',
+            'no-speech': 'No speech detected — still listening.',
             'audio-capture': 'No microphone was found. Check your microphone.',
             'network': 'Speech recognition needs a network connection in this browser.',
-            'aborted': 'Voice listening stopped.'
+            'aborted': 'Voice listening interrupted — restarting…'
           };
-          setVoiceUI(false, errors[event.error] || 'Voice error: ' + event.error);
+
+          // Only a real permission/device failure should permanently stop listening.
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'audio-capture') {
+            setVoiceUI(false, errors[event.error]);
+            manualStop = true;
+          } else {
+            setVoiceUI(true, errors[event.error] || 'Voice listening interrupted — restarting…');
+          }
         };
 
         recognition.onend = () => {
-          isListening = false;
-          voiceButton.classList.remove('listening');
-          voiceIcon.textContent = '🎙️';
-          voiceLabel.textContent = 'VOICE';
-
-          // Do not auto-restart after errors or a manual stop.
-          // A fresh click starts a new microphone session.
+          // Keep voice control alive until the user explicitly says "stop"
+          // or presses the VOICE button while listening.
           if (!manualStop) {
-            voiceStatus.textContent = 'Voice session ended. Click VOICE to listen again.';
+            isListening = true;
+            voiceButton.classList.add('listening');
+            voiceIcon.textContent = '🔴';
+            voiceLabel.textContent = 'LISTENING';
+            voiceStatus.textContent = 'Still listening… say a command. Say “stop” to end voice control.';
+
+            clearTimeout(restartTimer);
+            restartTimer = setTimeout(() => {
+              if (!manualStop) startRecognition();
+            }, 150);
+          } else {
+            setVoiceUI(false, 'Voice control stopped.');
           }
         };
 
